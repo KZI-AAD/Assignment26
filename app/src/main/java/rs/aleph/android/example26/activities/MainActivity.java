@@ -76,7 +76,7 @@ public class MainActivity extends AppCompatActivity implements OnProductSelected
 
     private DatabaseHelper databaseHelper;
     private ImageView preview;
-    private String imagePath;
+    private String imagePath = null;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -187,22 +187,29 @@ public class MainActivity extends AppCompatActivity implements OnProductSelected
             public void onClick(View v) {
                 String name = productName.getText().toString();
 
-                if (!imagePath.equals("") && preview != null){
-                    Category category = new Category();
-                    category.setName(name);
-                    category.setImage(imagePath);
+                if (preview == null || imagePath == null){
+                    Toast.makeText(MainActivity.this, "Slika mora biti izabrana", Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
-                    try {
-                        getDatabaseHelper().getCategoryDao().create(category);
-                        refresh();
-                        Toast.makeText(MainActivity.this, "Category inserted", Toast.LENGTH_SHORT).show();
-                        dialog.dismiss();
+                if (name.isEmpty()){
+                    Toast.makeText(MainActivity.this, "Ime kategorije ne sme biti prazno", Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
-                        reset();
+                Category category = new Category();
+                category.setName(name);
+                category.setImage(imagePath);
 
-                    } catch (SQLException e) {
-                        e.printStackTrace();
-                    }
+                try {
+                    getDatabaseHelper().getCategoryDao().create(category);
+                    refresh();
+                    Toast.makeText(MainActivity.this, "Category inserted", Toast.LENGTH_SHORT).show();
+                    dialog.dismiss();
+
+                    reset();
+                } catch (SQLException e) {
+                    e.printStackTrace();
                 }
             }
         });
@@ -241,7 +248,9 @@ public class MainActivity extends AppCompatActivity implements OnProductSelected
 
                 try {
                     Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), selectedImageUri);
-                    imagePath = selectedImageUri.toString();
+                    if (selectedImageUri != null){
+                        imagePath = selectedImageUri.toString();
+                    }
 
                     if (preview != null){
                         preview.setImageBitmap(bitmap);
@@ -282,12 +291,32 @@ public class MainActivity extends AppCompatActivity implements OnProductSelected
         ok.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String name = productName.getText().toString();
-                String desct = productDescr.getText().toString();
-                float price = Float.parseFloat(productRating.getText().toString());
-                Category categoty = (Category) productsSpinner.getSelectedItem();
+                try {
+                    String name = productName.getText().toString();
+                    String desct = productDescr.getText().toString();
+                    float price = Float.parseFloat(productRating.getText().toString());
+                    Category categoty = (Category) productsSpinner.getSelectedItem();
 
-                if (!imagePath.equals("") && preview != null){
+                    if (name.isEmpty()){
+                        Toast.makeText(MainActivity.this, "Ime proizvoda ne sme biti prazno", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    if (desct.isEmpty()){
+                        Toast.makeText(MainActivity.this, "Opis proizvoda ne sme biti prazno", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    if (categoty == null){
+                        Toast.makeText(MainActivity.this, "Kategorija mora biti izabrana", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    if (preview == null || imagePath == null){
+                        Toast.makeText(MainActivity.this, "Slika mora biti izabrana", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
                     Product product = new Product();
                     product.setmName(name);
                     product.setDescription(desct);
@@ -295,17 +324,19 @@ public class MainActivity extends AppCompatActivity implements OnProductSelected
                     product.setImage(imagePath);
                     product.setCategory(categoty);
 
-                    try {
-                        getDatabaseHelper().getProductDao().create(product);
-                        refresh();
-                        Toast.makeText(MainActivity.this, "Product inserted", Toast.LENGTH_SHORT).show();
-                        dialog.dismiss();
 
-                        reset();
+                    getDatabaseHelper().getProductDao().create(product);
+                    refresh();
+                    Toast.makeText(MainActivity.this, "Product inserted", Toast.LENGTH_SHORT).show();
+                    dialog.dismiss();
 
-                    } catch (SQLException e) {
-                        e.printStackTrace();
-                    }
+                    reset();
+
+                } catch (SQLException e) {
+                    e.printStackTrace();
+
+                }catch (NumberFormatException ee){
+                    Toast.makeText(MainActivity.this, "Rating more biti broj", Toast.LENGTH_SHORT).show();
                 }
             }
         });
@@ -317,6 +348,10 @@ public class MainActivity extends AppCompatActivity implements OnProductSelected
                 dialog.dismiss();
             }
         });
+
+        if (dataAdapter.isEmpty()){
+            Toast.makeText(MainActivity.this, "Ne postoji ni jedna uneta kategorija. Prvo unestie kategoriju", Toast.LENGTH_SHORT).show();
+        }
 
         dialog.show();
     }
