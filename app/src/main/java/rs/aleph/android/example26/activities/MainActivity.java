@@ -1,19 +1,26 @@
 package rs.aleph.android.example26.activities;
 
+import android.Manifest;
 import android.app.Dialog;
 import android.app.FragmentTransaction;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.database.Cursor;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -77,6 +84,8 @@ public class MainActivity extends AppCompatActivity implements OnProductSelected
     private DatabaseHelper databaseHelper;
     private ImageView preview;
     private String imagePath = null;
+
+    private static final String TAG = "PERMISSIONS";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -166,6 +175,37 @@ public class MainActivity extends AppCompatActivity implements OnProductSelected
         preview = null;
     }
 
+    public  boolean isStoragePermissionGranted() {
+        if (Build.VERSION.SDK_INT >= 23) {
+            if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    == PackageManager.PERMISSION_GRANTED &&
+                    checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+                            == PackageManager.PERMISSION_GRANTED) {
+                Log.v(TAG,"Permission is granted");
+                return true;
+            } else {
+
+                Log.v(TAG,"Permission is revoked");
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                        Manifest.permission.READ_EXTERNAL_STORAGE}, 1);
+                return false;
+            }
+        }
+        else { //permission is automatically granted on sdk<23 upon installation
+            Log.v(TAG,"Permission is granted");
+            return true;
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if(grantResults[0]== PackageManager.PERMISSION_GRANTED
+                && grantResults[1] == PackageManager.PERMISSION_GRANTED){
+            Log.v(TAG,"Permission: "+permissions[0]+ "was "+grantResults[0]);
+        }
+    }
+
     private void addCategory(){
         final Dialog dialog = new Dialog(this);
         dialog.setContentView(R.layout.dialog_category_layout);
@@ -226,44 +266,37 @@ public class MainActivity extends AppCompatActivity implements OnProductSelected
 
     }
 
-//     private void selectPicture(){
-//         Intent intent = new Intent();
-//         intent.setType("image/*");
-//         intent.setAction(Intent.ACTION_GET_CONTENT);
-//         startActivityForResult(Intent.createChooser(intent, "Select Picture"), SELECT_PICTURE);
-//     }
-    
     private void selectPicture(){
-        Intent intent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-        //intent.setType("image/*");
-        intent.setAction(Intent.ACTION_GET_CONTENT);
-        startActivityForResult(Intent.createChooser(intent, "Select Picture"), SELECT_PICTURE);
+        if (isStoragePermissionGranted()) {
+            Intent i = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+            startActivityForResult(i, SELECT_PICTURE);
+        }
     }
 
-    /**
-     * Sismtemska metoda koja se automatksi poziva ako se
-     * aktivnost startuje u startActivityForResult rezimu
-     *
-     * Ako je ti slucaj i ako je sve proslo ok, mozemo da izvucemo
-     * sadrzaj i to da prikazemo. Rezultat NIJE sliak nego URI do te slike.
-     * Na osnovu toga mozemo dobiti tacnu putnaju do slike ali i samu sliku
-     * */
+    @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (resultCode == RESULT_OK) {
-            if (requestCode == SELECT_PICTURE) {
-                Uri selectedImageUri = data.getData();
+        super.onActivityResult(requestCode, resultCode, data);
 
-                try {
-                    Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), selectedImageUri);
-                    if (selectedImageUri != null){
-                        imagePath = selectedImageUri.toString();
+        if (requestCode == SELECT_PICTURE && resultCode == RESULT_OK && null != data) {
+            Uri selectedImage = data.getData();
+            String[] filePathColumn = { MediaStore.Images.Media.DATA };
+
+            if (selectedImage != null) {
+                Cursor cursor = getContentResolver().query(selectedImage, filePathColumn, null, null, null);
+                if (cursor != null) {
+                    cursor.moveToFirst();
+
+                    int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
+                    imagePath = cursor.getString(columnIndex);
+                    cursor.close();
+
+                    // String picturePath contains the path of selected Image
+
+                    if (preview != null) {
+                        preview.setImageBitmap(BitmapFactory.decodeFile(imagePath));
                     }
 
-                    if (preview != null){
-                        preview.setImageBitmap(bitmap);
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
+                    Toast.makeText(this, imagePath, Toast.LENGTH_SHORT).show();
                 }
             }
         }
